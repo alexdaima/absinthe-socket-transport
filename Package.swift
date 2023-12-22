@@ -13,8 +13,8 @@ let package = Package(
             targets: ["AbsintheSocketTransport"]),
     ],
     dependencies: [
-      .package(url: "https://github.com/davidstump/SwiftPhoenixClient.git", from: "3.0.0"),
-      .package(name: "Apollo", url: "https://github.com/apollographql/apollo-ios.git", .upToNextMinor(from: "0.50.0")),
+      .package(url: "https://github.com/davidstump/SwiftPhoenixClient.git", from: "5.3.1"),
+      .package(name: "Apollo", url: "https://github.com/apollographql/apollo-ios.git", .upToNextMajor(from: "1.7.1")),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.

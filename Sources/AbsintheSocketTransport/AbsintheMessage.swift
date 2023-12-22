@@ -1,112 +1,113 @@
 import os
 import Apollo
+import ApolloAPI
 import Foundation
 import SwiftPhoenixClient
 
 enum AbsintheMessage {
-  case error
-  case response
-  case subscriptionStart
-  case subscriptionResult
+    case error
+    case response
+    case subscriptionStart
+    case subscriptionResult
 
-  //
-  // MARK: - Outgoing Messages
-  //
+    //
+    // MARK: - Outgoing Messages
+    //
 
-  /**
-   * Creates an outgoing message for the given GraphQL operation.
-   *
-   * - parameter op: GraphQLOperation as supplied by Apollo
-   * - returns: Outgoing message payload
-   */
-  static func fromOperation<Operation: GraphQLOperation>(_ op: Operation) -> [String: Any] {
-    var payload: [String: Any]
-    payload = [ "query": op.queryDocument ]
+    /**
+    * Creates an outgoing message for the given GraphQL operation.
+    *
+    * - parameter op: GraphQLOperation as supplied by Apollo
+    * - returns: Outgoing message payload
+    */
+    static func fromOperation<Operation: GraphQLOperation>(_ op: Operation) -> [String: Any] {
+        var payload: [String: Any]
+        payload = [ "query": Operation.operationDocument ]
 
-    if let variables = op.variables {
-      payload += [ "variables": variables ]
+        if let variables = op.__variables {
+            payload += [ "variables": variables ]
+        }
+
+        return payload
     }
 
-    return payload
-  }
-
-  /**
-   * Creates an outgoing message to unsubscribe from the given subscription by `id`.
-   *
-   * - parameter id: Absinthe subscription ID
-   * - returns: Outgoing message payload
-   */
-  static func unsubscribe(id: String) -> [String: Any] {
-    return [ "subscriptionId": id ]
-  }
-
-  //
-  // MARK: - Incoming Messages
-  //
-
-  /**
-   * Parse a channel message and call the given completion handler with the result.
-   *
-   * This function is meant to be used for both successful (status "ok") and unsuccessful (status "error") messages.
-   *
-   * - parameter operation: The original GraphQL operation (for typing the response)
-   * - parameter message: Message as read by the Phoenix socket
-   * - returns: Result with a typed `GraphQLResult` as expected by Apollo
-   */
-  static func parseResponse<Operation: GraphQLOperation>(
-    operation: Operation,
-    message: Message
-  ) -> Result<GraphQLResult<Operation.Data>, Error> {
-    guard let response = message.payload as [String: Any]?
-    else {
-      return .failure(AbsintheError(kind: .parseError, payload: message.payload))
+    /**
+    * Creates an outgoing message to unsubscribe from the given subscription by `id`.
+    *
+    * - parameter id: Absinthe subscription ID
+    * - returns: Outgoing message payload
+    */
+    static func unsubscribe(id: String) -> [String: Any] {
+        return [ "subscriptionId": id ]
     }
 
-    do {
-      return try .success(GraphQLResponse(operation: operation, body: response).parseResultFast())
-    } catch {
-      return .failure(error)
-    }
-  }
+    //
+    // MARK: - Incoming Messages
+    //
 
-  /**
-   * Parse a subscription start confirmation.
-   *
-   * - parameter message: Message as read by the Phoenix socket
-   * - returns: Result with the subscription ID
-   */
-  static func parseSubscriptionStart(_ message: Message) -> Result<String, Error> {
-    guard message.status == "ok" else {
-      return .failure(AbsintheError(kind: .queryError, payload: message.payload))
-    }
+    /**
+    * Parse a channel message and call the given completion handler with the result.
+    *
+    * This function is meant to be used for both successful (status "ok") and unsuccessful (status "error") messages.
+    *
+    * - parameter operation: The original GraphQL operation (for typing the response)
+    * - parameter message: Message as read by the Phoenix socket
+    * - returns: Result with a typed `GraphQLResult` as expected by Apollo
+    */
+    static func parseResponse<Operation: GraphQLOperation>(
+        operation: Operation,
+        message: Message
+    ) -> Result<Apollo.GraphQLResult<Operation.Data>, Error> {
+        guard let response = message.payload as [String: Any]?
+        else {
+            return .failure(AbsintheError(kind: .parseError, payload: message.payload))
+        }
 
-    guard let id = message.payload["subscriptionId"] as? String else {
-      return .failure(AbsintheError(kind: .parseError, payload: message.payload))
-    }
-
-    return .success(id)
-  }
-
-  /**
-   * Parse a subscription result.
-   *
-   * - parameter operation: The original GraphQL operation (for typing the response)
-   * - parameter message: Message as read by the Phoenix socket
-   * - returns: Result with a typed `GraphQLResult` as expected by Apollo
-   */
-  static func parseSubscriptionResult<Operation: GraphQLOperation>(
-    operation: Operation,
-    message: Message
-  ) -> Result<GraphQLResult<Operation.Data>, Error> {
-    guard let response = message.payload["result"] as? [String: Any]
-    else {
-      return .failure(AbsintheError(kind: .parseError, payload: message.payload))
+        do {
+            return try .success(GraphQLResponse(operation: operation, body: response.compactMapValues { $0 as? AnyHashable }).parseResultFast())
+        } catch {
+            return .failure(error)
+        }
     }
 
-    do {
-      return try .success(GraphQLResponse(operation: operation, body: response).parseResultFast())
-    } catch {
-      return .failure(error)
+    /**
+    * Parse a subscription start confirmation.
+    *
+    * - parameter message: Message as read by the Phoenix socket
+    * - returns: Result with the subscription ID
+    */
+    static func parseSubscriptionStart(_ message: Message) -> Result<String, Error> {
+        guard message.status == "ok" else {
+            return .failure(AbsintheError(kind: .queryError, payload: message.payload))
+        }
+
+        guard let id = message.payload["subscriptionId"] as? String else {
+            return .failure(AbsintheError(kind: .parseError, payload: message.payload))
+        }
+
+        return .success(id)
     }
-  }
+
+    /**
+    * Parse a subscription result.
+    *
+    * - parameter operation: The original GraphQL operation (for typing the response)
+    * - parameter message: Message as read by the Phoenix socket
+    * - returns: Result with a typed `GraphQLResult` as expected by Apollo
+    */
+    static func parseSubscriptionResult<Operation: GraphQLOperation>(
+        operation: Operation,
+        message: Message
+    ) -> Result<Apollo.GraphQLResult<Operation.Data>, Error> {
+        guard let response = message.payload["result"] as? [String: Any]
+        else {
+            return .failure(AbsintheError(kind: .parseError, payload: message.payload))
+        }
+
+        do {
+            return try .success(GraphQLResponse(operation: operation, body: response.compactMapValues { $0 as? AnyHashable }).parseResultFast())
+        } catch {
+            return .failure(error)
+        }
+    }
 }
